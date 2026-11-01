@@ -34,5 +34,5 @@ datasets/
 - Test the segmentation performance
 
 ```
-$ python test.py
+$ python test.py --dataset_root "/path/to/the/folder/datasets/"
 ```
