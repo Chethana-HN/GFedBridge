@@ -15,7 +15,7 @@ This is the test code of our IEEE Journal of Biomedical and Health Informatics (
 - `pip install -r requirements.txt`
 
 ## Testing
-- Download the datasets folder from [GoogleDrive](https://drive.google.com/file/d/120tNaaOOAl6CjEz6e67xvAeVwfe4ekz5/view?usp=sharing) and place them in the project directory.
+- Download the datasets folder from [GoogleDrive](https://drive.google.com/file/d/120tNaaOOAl6CjEz6e67xvAeVwfe4ekz5/view?usp=sharing) and place them in the GFedBridge project directory.
 
 - The folder structure within `datasets` should be organized as follows:
 ```
@@ -29,6 +29,7 @@ datasets/
 ├── C4/
 
 ```
+- Download the checkpoints folder from [GoogleDrive](https://drive.google.com/file/d/1zIVdrbANFbrw515u1QhkG8r8z-8A7GGY/view?usp=sharing) and place them in the project directory as GFedBridge/checkpoints/
 
 - Test the segmentation performance
 
