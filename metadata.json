@@ -1,0 +1,53 @@
+{
+  "format": "gfedbridge_jit_eval_v1",
+  "image_size": 256,
+  "seed": 42,
+  "clients": {
+    "S1": {
+      "dataset_client": "S1",
+      "sparse_type": "bbox",
+      "mask_suffix": "",
+      "test_split": "test",
+      "threshold": 0.5,
+      "checkpoint": "checkpoints/S1.pth",
+      "max_abs_error": 5.960464477539063e-08,
+      "validated_samples": 100
+    },
+    "S2": {
+      "dataset_client": "S2",
+      "sparse_type": "bbox",
+      "mask_suffix": "",
+      "test_split": "test",
+      "threshold": 0.5,
+      "checkpoint": "checkpoints/S2.pth",
+      "max_abs_error": 4.972098395228386e-07,
+      "validated_samples": 82
+    },
+    "S4": {
+      "dataset_client": "S3",
+      "sparse_type": "supervised",
+      "mask_suffix": "_segmentation",
+      "test_split": "test",
+      "threshold": 0.5,
+      "checkpoint": "checkpoints/S4.pth",
+      "max_abs_error": 5.960464477539063e-08,
+      "validated_samples": 45
+    },
+    "S3": {
+      "dataset_client": "S4",
+      "sparse_type": "bbox",
+      "mask_suffix": "",
+      "test_split": "test",
+      "threshold": 0.5,
+      "checkpoint": "checkpoints/S3.pth",
+      "max_abs_error": 5.21540641784668e-07,
+      "validated_samples": 40
+    }
+  },
+  "source_to_display": {
+    "S1": "S1",
+    "S2": "S2",
+    "S3": "S4",
+    "S4": "S3"
+  }
+}
