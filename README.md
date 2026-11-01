@@ -15,7 +15,7 @@ This is the test code of our IEEE Journal of Biomedical and Health Informatics (
 - `pip install -r requirements.txt`
 
 ## Testing
-- Download the datasets folder from [GoogleDrive](https://drive.google.com/file/d/1DrRiLPOoXoMlnXKsxSx4c52QxHGKZ559/view?usp=sharing) and place them in the project directory.
+- Download the datasets folder from [GoogleDrive](https://drive.google.com/file/d/120tNaaOOAl6CjEz6e67xvAeVwfe4ekz5/view?usp=sharing) and place them in the project directory.
 
 - The folder structure within `datasets` should be organized as follows:
 ```
