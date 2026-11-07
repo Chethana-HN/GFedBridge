@@ -53,12 +53,6 @@ def stable_sample_seed(
     sample_id: str,
     sparse_type: str,
 ) -> int:
-    """
-    Produce the same annotation seed for the same sample on every run.
-
-    sparse_type is included so that assigning a different weak-label type to
-    the same image does not reuse the random stream of another annotation type.
-    """
     key = (
         f"{int(base_seed)}|{client_id}|{split}|"
         f"{sample_id}|{sparse_type}"
@@ -119,21 +113,6 @@ def discover_samples(
     split: str,
     mask_suffix: str = "",
 ) -> List[BreastSample]:
-    """
-    Expected structure:
-
-        dataset_root/
-          B1/
-            train/
-              image/
-              mask/
-            validation/
-              image/
-              mask/
-            test/
-              image/
-              mask/
-    """
     split_dir = Path(dataset_root) / str(client_id) / str(split)
     image_dir = split_dir / "image"
     mask_dir = split_dir / "mask"
@@ -186,14 +165,6 @@ def _resize_sparse_binary(
     array: np.ndarray,
     size_hw: Tuple[int, int],
 ) -> np.ndarray:
-    """
-    Resize a sparse annotation without deleting isolated labelled pixels.
-
-    Nearest-neighbour resizing can completely remove a one-pixel scribble
-    during downsampling. For reductions, BOX resampling performs occupancy
-    aggregation; thresholding at >0 preserves every source annotation cell.
-    Upsampling continues to use nearest-neighbour interpolation.
-    """
     source = (np.asarray(array) > 0).astype(np.uint8)
     source_height, source_width = source.shape
     target_height, target_width = size_hw
@@ -304,24 +275,6 @@ def _validate_annotation(
 
 
 class BreastWeakDataset(Dataset):
-    """
-    Breast-tumor dataset with deterministic sparse or labelled conditions.
-
-    Important supervision rule
-    --------------------------
-    For point, scribble, and bbox modes, the dense segmentation mask is used
-    only inside this dataset to simulate the requested sparse annotation. For
-    labelled mode, the complete mask is intentionally supplied in the model
-    condition and therefore acts as an oracle input. The dense mask is not
-    returned separately for training unless return_dense_mask=True is set.
-    Validation/test loaders should set return_dense_mask=True so Dice, IoU,
-    and HD95 can be computed.
-
-    Sparse annotations are generated at the original image/mask resolution
-    and resized afterward with nearest-neighbor interpolation. For bbox
-    clients, the original RGB image is used by Select(x, B) to choose a
-    small image-supported foreground seed set inside each box.
-    """
 
     def __init__(
         self,
@@ -364,8 +317,6 @@ class BreastWeakDataset(Dataset):
         self.base_seed = int(base_seed)
         self.cache_in_memory = bool(cache_in_memory)
 
-        # Safe default: dense masks are available for validation/test metrics,
-        # but not exposed by the training dataset.
         if return_dense_mask is None:
             self.return_dense_mask = split in {
                 "val",
@@ -408,9 +359,6 @@ class BreastWeakDataset(Dataset):
         original_image: np.ndarray,
         original_dense_mask: np.ndarray,
     ) -> Dict[str, np.ndarray]:
-        """
-        Generate the assigned weak annotation at original resolution.
-        """
         if original_image.ndim != 3 or original_image.shape[2] != 3:
             raise RuntimeError(
                 f"Expected RGB image [H,W,3], got "
@@ -461,9 +409,6 @@ class BreastWeakDataset(Dataset):
             )
 
         elif self.sparse_type == "supervised":
-            # Fully supervised client: the dense mask is NOT placed in the
-            # model condition. Placeholder sparse maps are all zero; the dense
-            # mask is returned separately as the training target.
             zeros = np.zeros_like(
                 original_dense_mask,
                 dtype=np.uint8,
@@ -591,9 +536,7 @@ class BreastWeakDataset(Dataset):
         annotation: Mapping[str, np.ndarray],
         resized_dense_mask: np.ndarray,
     ) -> Dict[str, np.ndarray]:
-        """
-        Resize a generated weak annotation to the network resolution.
-        """
+
         if self.sparse_type in {"point", "scribble"}:
             positive = _resize_sparse_binary(
                 annotation["positive"],
@@ -619,8 +562,6 @@ class BreastWeakDataset(Dataset):
             )
 
         if self.sparse_type == "bbox":
-            # Do not use the dense mask to alter bbox foreground seeds.
-            # GFedBridge bbox supervision remains Select(image, box).
             positive = (
                 positive * box_region
             ).astype(np.uint8)
@@ -630,8 +571,6 @@ class BreastWeakDataset(Dataset):
             ).astype(np.uint8)
 
         elif self.sparse_type == "supervised":
-            # Fully supervised mode uses the dense mask only as a separate
-            # target. Sparse maps and all condition channels stay zero.
             positive = np.zeros_like(
                 resized_dense_mask,
                 dtype=np.uint8,
@@ -643,8 +582,6 @@ class BreastWeakDataset(Dataset):
             box_region.fill(0)
 
         elif self.sparse_type == "labelled":
-            # Oracle/labelled-condition mode: the complete resized mask is
-            # supplied as the condition and as dense positive/negative seeds.
             dense = (
                 np.asarray(resized_dense_mask) > 0
             ).astype(np.uint8)
@@ -660,9 +597,6 @@ class BreastWeakDataset(Dataset):
             )
             box_region.fill(0)
 
-            # Sparse maps and GT are resized independently. Occupancy-
-            # preserving downsampling can move a boundary label by one output
-            # pixel. Re-apply the class constraint at network resolution.
             dense = (
                 np.asarray(resized_dense_mask) > 0
             ).astype(np.uint8)
@@ -674,7 +608,6 @@ class BreastWeakDataset(Dataset):
                 negative * (1 - dense)
             ).astype(np.uint8)
 
-            # Preserve minimal positive supervision for a non-empty lesion.
             if dense.any() and not positive.any():
                 candidates = np.argwhere(dense > 0)
                 y, x = candidates[len(candidates) // 2]
@@ -774,14 +707,6 @@ class BreastWeakDataset(Dataset):
         known_mask = ((positive > 0) | (negative > 0)).astype(np.uint8)
         sparse_target = positive.copy()
 
-        # The model always receives three condition channels:
-        #   channel 0: foreground labels
-        #   channel 1: background labels
-        #   channel 2: bbox region (zero for labelled mode)
-        #
-        # In labelled mode, channels 0 and 1 contain the complete foreground
-        # and background masks. This is an oracle condition, not a standard
-        # image-only supervised baseline.
         if self.sparse_type == "supervised":
             condition = np.zeros(
                 (3, self.image_size[0], self.image_size[1]),
