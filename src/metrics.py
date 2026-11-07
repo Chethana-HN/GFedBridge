@@ -23,14 +23,6 @@ def hd95_single(
     target: np.ndarray,
     spacing: tuple[float, float] = (1.0, 1.0),
 ) -> float:
-    """
-    Symmetric 95th-percentile Hausdorff distance.
-
-    Returns:
-      0.0  : both masks empty
-      inf  : exactly one mask empty
-      value: HD95 in pixels when spacing=(1,1), otherwise in physical units
-    """
     prediction = prediction.astype(bool)
     target = target.astype(bool)
 
@@ -118,12 +110,6 @@ def per_sample_segmentation_metrics(
 def summarize_metric(
     values: list[float],
 ) -> tuple[float, float, int]:
-    """
-    Return mean, sample SD, and number of finite observations.
-
-    Infinite HD95 values are excluded from the finite mean and SD. The caller
-    should report the number of excluded infinite cases separately.
-    """
     array = np.asarray(values, dtype=np.float64)
     finite = array[np.isfinite(array)]
 
