@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Public test-only evaluator: four TorchScript models, exact original metrics."""
 import argparse,json
 from pathlib import Path
 import torch
@@ -38,7 +37,6 @@ def main():
         client={'dice':[],'iou':[],'hd95':[]}
         with torch.inference_mode():
             for raw in loader:
-                # Same tensor conversions and dimensions as original prepare_batch().
                 def tensor(k):
                     x=raw[k]
                     if not torch.is_tensor(x):x=torch.as_tensor(x)
