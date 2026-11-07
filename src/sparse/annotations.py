@@ -45,13 +45,6 @@ def _paint_patch(
     patch_size: int,
     valid_region: np.ndarray | None = None,
 ) -> None:
-    """
-    Paint a square patch centred as closely as possible on (x, y).
-
-    FedSLAG used top-left anchored 8x8 patches. Here we preserve the same
-    patch-based point supervision while centring the patch and optionally
-    clipping it to a valid foreground/background region.
-    """
     patch_size = max(1, int(patch_size))
     height, width = canvas.shape
 
@@ -86,17 +79,6 @@ def generate_point_annotation(
     mask: np.ndarray,
     patch_size: int = 8,
 ) -> Dict[str, np.ndarray]:
-    """
-    Generate FedSLAG-style point supervision.
-
-    For each foreground contour:
-      - four foreground patches are placed around the lesion interior;
-      - four background patches are placed farther from the lesion;
-      - foreground patches are clipped to foreground;
-      - background patches are clipped to background.
-
-    For empty masks, only deterministic background patches are produced.
-    """
     binary = _as_binary_2d(mask)
     height, width = binary.shape
 
@@ -204,9 +186,6 @@ def _adaptive_erosion(
     erosion_max: int,
     area_threshold: int = 400,
 ) -> np.ndarray:
-    """
-    FedSLAG-style random erosion with safeguards against deleting a component.
-    """
     region = (region > 0).astype(np.uint8)
 
     if int(region.sum()) <= area_threshold:
@@ -226,7 +205,6 @@ def _adaptive_erosion(
         iterations=iterations,
     )
 
-    # Do not allow random erosion to erase an existing class completely.
     if not eroded.any():
         for reduced_iterations in range(iterations - 1, 0, -1):
             eroded = ndimage.binary_erosion(
@@ -250,13 +228,6 @@ def _skeleton_for_region(
     erosion_max: int,
     dilation_size: int,
 ) -> np.ndarray:
-    """
-    Generate one class scribble using FedSLAG's erode→skeletonize→dilate flow.
-
-    Important correction:
-    ``skeletonize`` returns a boolean array in current scikit-image versions.
-    Comparing it with 255, as in the original script, can erase the skeleton.
-    """
     region = (region > 0).astype(np.uint8)
 
     if not region.any():
@@ -274,7 +245,6 @@ def _skeleton_for_region(
         method="lee",
     )
 
-    # Correct boolean handling: never compare the result to 255.
     skeleton = (np.asarray(skeleton) > 0).astype(np.uint8)
 
     if not skeleton.any():
@@ -286,10 +256,6 @@ def _skeleton_for_region(
             np.asarray(skeleton) > 0
         ).astype(np.uint8)
 
-    # A non-empty class must not silently lose all supervision. This can
-    # happen for very small components with some skeletonize versions.
-    # Select one real class pixel nearest the component centroid as a
-    # minimal one-pixel scribble fallback.
     if not skeleton.any():
         ys, xs = np.nonzero(region)
         if len(xs) > 0:
@@ -321,12 +287,7 @@ def _fallback_background_scribble(
     shape: Tuple[int, int],
     width: int = 2,
 ) -> np.ndarray:
-    """
-    Deterministic background scribble for an all-background image.
 
-    A full-image background skeleton can be empty or dominated by borders,
-    so use a sparse central cross only for the empty-lesion special case.
-    """
     height, width_image = shape
     output = np.zeros(shape, dtype=np.uint8)
 
@@ -365,16 +326,7 @@ def generate_scribble_annotation(
     erosion_max: int = 11,
     dilation_size: int = 2,
 ) -> Dict[str, np.ndarray]:
-    """
-    Generate binary foreground/background scribbles.
 
-    This follows FedSLAG's class-wise procedure:
-      foreground mask → erode → skeletonize → dilate
-      background mask → erode → skeletonize → dilate
-
-    The resulting background scribble may be loop-like because it is the
-    skeleton of the full background class. That is expected FedSLAG behaviour.
-    """
     binary = _as_binary_2d(mask)
     foreground = binary
     background = (1 - binary).astype(np.uint8)
@@ -426,9 +378,6 @@ def _connected_component_boxes(
     max_displacement: int,
     noisy: bool,
 ) -> List[Tuple[int, int, int, int]]:
-    """
-    FedSLAG-style component bounding boxes with optional x/y/w/h perturbation.
-    """
     binary = _as_binary_2d(mask)
     height, width = binary.shape
 
@@ -532,15 +481,6 @@ def _bbox_image_supported_foreground(
     gradient_weight: float,
     inner_margin_fraction: float,
 ) -> np.ndarray:
-    """
-    Implement the paper's Select(x, B).
-
-    Only image and box geometry are used here. The dense mask is not consulted.
-    Candidate pixels are restricted to the inner box and ranked using:
-      - preference for central box locations;
-      - preference for low local gradient (region interior evidence);
-      - deterministic tiny jitter for tie-breaking.
-    """
     box = (box_region > 0).astype(np.uint8)
     output = np.zeros_like(box, dtype=np.uint8)
 
@@ -692,16 +632,6 @@ def generate_bbox_annotation(
     gradient_weight: float = 1.0,
     inner_margin_fraction: float = 0.15,
 ) -> Dict[str, np.ndarray]:
-    """
-    Generate paper-consistent bbox supervision.
-
-    FedSLAG component boxes are retained, but GFedBridge does not treat the
-    full box as foreground:
-
-      box_region = noisy component boxes
-      negative   = outside-box trusted background
-      positive   = Select(image, box_region), a small image-supported seed set
-    """
     binary = _as_binary_2d(mask)
 
     if np.asarray(image).shape[:2] != binary.shape:
